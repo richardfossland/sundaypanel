@@ -475,6 +475,128 @@ textarea.field {
   }
 }
 
+/* ---------------- board: live poll ---------------- */
+
+.board-poll {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3vmin 2vmin;
+}
+
+.poll {
+  width: 100%;
+  max-width: 60ch;
+  margin: 0 auto;
+}
+
+.poll-q {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.4rem, 4.5vmin, 3.4rem);
+  line-height: 1.2;
+  text-align: center;
+  margin: 0 0 4vmin;
+  overflow-wrap: break-word;
+}
+
+.poll-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2vmin;
+}
+
+.poll-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: clamp(1rem, 2.6vmin, 2rem);
+  margin-bottom: 0.6vmin;
+}
+
+.poll-opt {
+  font-weight: 600;
+}
+
+.poll-pct {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.poll-count {
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 0.8em;
+}
+
+.poll-track {
+  background: var(--bg-soft);
+  border: 1px solid var(--card-edge);
+  border-radius: 999px;
+  height: clamp(18px, 4vmin, 44px);
+  overflow: hidden;
+}
+
+.poll-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+  border-radius: 999px;
+  transition: width 0.5s ease;
+  min-width: 2px;
+}
+
+.poll-row--lead .poll-fill {
+  background: linear-gradient(90deg, var(--accent), #ffd98a);
+}
+
+.poll-total {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: clamp(0.9rem, 2vmin, 1.4rem);
+  margin-top: 3vmin;
+}
+
+/* ---------------- audience: poll voting card ---------------- */
+
+.poll-vote .poll-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.poll-choice {
+  background: var(--bg-soft);
+  border: 1px solid var(--card-edge);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  font-weight: 600;
+  font-size: 1.05rem;
+  text-align: left;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.poll-choice:hover {
+  border-color: var(--accent);
+}
+
+.poll-choice--on {
+  border-color: var(--accent);
+  background: var(--card);
+  color: var(--accent);
+}
+
+/* ---------------- moderator: poll admin ---------------- */
+
+.poll-admin .poll-create {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .tabs {
   display: flex;
   gap: 6px;

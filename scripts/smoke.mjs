@@ -121,6 +121,50 @@ check("vote on hidden → 404", r.status === 404);
 r = await api("POST", "/api/moderator", { sessionId: sid, organiserCode: ok, action: "mode", mode: "open" });
 check("switch to open mode", r.status === 200 && r.data?.mode === "open");
 
+// ---- live poll mode -------------------------------------------------------
+r = await api("POST", "/api/moderator", { sessionId: sid, organiserCode: ok, action: "mode", mode: "poll" });
+check("switch to poll mode", r.status === 200 && r.data?.mode === "poll");
+
+r = await api("POST", "/api/moderator", { sessionId: sid, organiserCode: ok, action: "poll", pollAction: "create", question: "Tror du på Gud?", options: ["Ja", "Nei", "Usikker"] });
+check("create poll", r.status === 200 && Array.isArray(r.data?.poll?.options));
+const pollId = r.data?.poll?.id;
+
+r = await api("POST", "/api/moderator", { sessionId: sid, organiserCode: ok, action: "poll", pollAction: "create", question: "x", options: ["bare ett"] });
+check("create poll w/ 1 option → 400", r.status === 400);
+
+r = await api("POST", "/api/moderator", { sessionId: sid, organiserCode: ok, action: "poll", pollAction: "show", pollId });
+check("show poll on board", r.status === 200 && r.data?.activePollId === pollId);
+
+r = await api("GET", `/api/state?sessionId=${sid}`);
+check("public state has active poll w/ tally", r.data?.session?.active_poll_id === pollId && r.data?.activePoll?.total === 0);
+
+r = await api("POST", "/api/poll-vote", { pollId, deviceToken: DEVICE_A, choice: "Ja" });
+check("cast poll vote", r.status === 200 && r.data?.choice === "Ja");
+r = await api("POST", "/api/poll-vote", { pollId, deviceToken: DEVICE_A, choice: "Nei" });
+check("re-cast updates choice", r.status === 200 && r.data?.choice === "Nei");
+r = await api("POST", "/api/poll-vote", { pollId, deviceToken: DEVICE_B, choice: "Ja" });
+check("second device votes", r.status === 200);
+
+r = await api("POST", "/api/poll-vote", { pollId, deviceToken: DEVICE_B, choice: "Kanskje" });
+check("invalid choice rejected (409)", r.status === 409);
+
+r = await api("GET", `/api/state?sessionId=${sid}`);
+check("tally aggregates: Ja=1 Nei=1 total=2", r.data?.activePoll?.counts?.Ja === 1 && r.data?.activePoll?.counts?.Nei === 1 && r.data?.activePoll?.total === 2);
+
+r = await api("POST", "/api/moderator", { sessionId: sid, organiserCode: ok, action: "poll", pollAction: "close", pollId });
+check("close poll", r.status === 200 && r.data?.status === "closed");
+r = await api("POST", "/api/poll-vote", { pollId, deviceToken: "device-cccc-99999", choice: "Ja" });
+check("vote on closed poll → 409", r.status === 409);
+
+r = await api("POST", "/api/moderator", { sessionId: sid, organiserCode: ok, action: "poll", pollAction: "show", pollId: null });
+check("clear poll from board", r.status === 200 && r.data?.activePollId === null);
+
+r = await api("POST", "/api/moderator", { sessionId: sid, organiserCode: "FEIL-KO", action: "poll", pollAction: "create", question: "q", options: ["a", "b"] });
+check("poll create w/ wrong organiser code → 403", r.status === 403);
+
+r = await api("POST", "/api/moderator", { sessionId: sid, organiserCode: ok, action: "mode", mode: "open" });
+check("back to open mode", r.status === 200);
+
 r = await api("POST", "/api/moderator", { sessionId: sid, organiserCode: ok, action: "status", status: "closed" });
 check("close submissions", r.status === 200);
 r = await api("POST", "/api/question", { sessionId: sid, body: "for sent?", deviceToken: DEVICE_B });

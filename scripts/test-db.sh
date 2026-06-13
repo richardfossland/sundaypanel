@@ -14,11 +14,21 @@ for _ in $(seq 1 30); do docker exec "$NAME" pg_isready -U postgres >/dev/null 2
 run() { docker cp "$1" "$NAME:/tmp/$(basename "$1")" >/dev/null; docker exec "$NAME" psql -U postgres -v ON_ERROR_STOP=1 -q -f "/tmp/$(basename "$1")"; }
 
 echo "→ prelude (Supabase role/publication shims)"; run supabase/tests/_prelude.sql
-echo "→ migration (1st apply)"; run supabase/migrations/0001_panel_schema.sql
-echo "→ migration (2nd apply — idempotency)"; run supabase/migrations/0001_panel_schema.sql
+echo "→ migration 0001 (1st apply)"; run supabase/migrations/0001_panel_schema.sql
+echo "→ migration 0001 (2nd apply — idempotency)"; run supabase/migrations/0001_panel_schema.sql
+echo "→ migration 0002 (1st apply)"; run supabase/migrations/0002_poll_mode.sql
+echo "→ migration 0002 (2nd apply — idempotency)"; run supabase/migrations/0002_poll_mode.sql
+
 echo "→ panel-logic assertions"
 docker cp supabase/tests/panel_logic_test.sql "$NAME:/tmp/panel_logic_test.sql" >/dev/null
 OUT=$(docker exec "$NAME" psql -U postgres -v ON_ERROR_STOP=1 -f /tmp/panel_logic_test.sql 2>&1)
 echo "$OUT" | grep -E "PASS|FAIL" || true
 echo "$OUT" | grep -q "ALL PANEL-LOGIC TESTS PASSED" || { echo "TESTS FAILED"; echo "$OUT" | tail -20; exit 1; }
+
+echo "→ poll-logic assertions"
+docker cp supabase/tests/poll_logic_test.sql "$NAME:/tmp/poll_logic_test.sql" >/dev/null
+OUT=$(docker exec "$NAME" psql -U postgres -v ON_ERROR_STOP=1 -f /tmp/poll_logic_test.sql 2>&1)
+echo "$OUT" | grep -E "PASS|FAIL" || true
+echo "$OUT" | grep -q "ALL POLL-LOGIC TESTS PASSED" || { echo "TESTS FAILED"; echo "$OUT" | tail -20; exit 1; }
+
 echo "✓ all database checks passed"

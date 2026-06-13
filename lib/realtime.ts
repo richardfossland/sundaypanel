@@ -10,4 +10,5 @@ export const events = {
   questionAdded: "question_added", // someone submitted → refetch list
   voteChanged: "vote_changed", // a vote toggled → refetch list
   stateChanged: "state_changed", // show/hide/answer/mode/close → refetch all
+  pollChanged: "poll_changed", // a poll opened/closed/shown or a response cast → refetch
 } as const;

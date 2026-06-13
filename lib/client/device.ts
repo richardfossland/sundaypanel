@@ -6,6 +6,7 @@
 const TOKEN_KEY = "panel:device";
 const MINE_KEY = "panel:mine"; // ids of questions submitted from this device
 const VOTED_KEY = "panel:voted"; // ids this device has upvoted
+const POLL_KEY = "panel:pollChoices"; // pollId → choice this device picked
 
 export function deviceToken(): string {
   if (typeof window === "undefined") return "";
@@ -49,4 +50,34 @@ export function setVoted(id: string, on: boolean) {
   if (on) cur.add(id);
   else cur.delete(id);
   writeIds(VOTED_KEY, [...cur]);
+}
+
+// ---- poll choices (which option this device picked, per poll) ----
+// Mirrors the dedup model: this is purely UI memory of the device's own
+// answer, never linked to identity. The server's PK(poll_id, device_token)
+// is the real one-vote guard.
+function readMap(key: string): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(key);
+    const obj = raw ? JSON.parse(raw) : {};
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(obj))
+      if (typeof v === "string") out[k] = v;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function pollChoices(): Record<string, string> {
+  return readMap(POLL_KEY);
+}
+
+export function setPollChoice(pollId: string, choice: string) {
+  const cur = readMap(POLL_KEY);
+  cur[pollId] = choice;
+  // Cap entries so it can't grow unbounded across many polls.
+  const entries = Object.entries(cur).slice(-200);
+  localStorage.setItem(POLL_KEY, JSON.stringify(Object.fromEntries(entries)));
 }

@@ -9,9 +9,11 @@ import {
   rememberMyQuestion,
   votedIds,
   setVoted,
+  pollChoices,
+  setPollChoice,
 } from "@/lib/client/device";
 import { useSessionState } from "@/lib/client/useSessionState";
-import type { PublicSession, Question } from "@/lib/types";
+import type { PollResults, PublicSession, Question } from "@/lib/types";
 
 const MAX = 280;
 
@@ -40,13 +42,34 @@ export default function AudiencePage({
   const [sentFlash, setSentFlash] = useState(false);
   const [mine, setMine] = useState<Set<string>>(new Set());
   const [voted, setVotedState] = useState<Set<string>>(new Set());
+  const [myPollChoices, setMyPollChoices] = useState<Record<string, string>>({});
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- read localStorage post-mount */
     setMine(myQuestionIds());
     setVotedState(votedIds());
+    setMyPollChoices(pollChoices());
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
+
+  async function castPoll(results: PollResults, choice: string) {
+    const pollId = results.poll.id;
+    const prev = myPollChoices[pollId];
+    setPollChoice(pollId, choice);
+    setMyPollChoices(pollChoices());
+    try {
+      await postJson("/api/poll-vote", {
+        pollId,
+        deviceToken: deviceToken(),
+        choice,
+      });
+      refetch();
+    } catch {
+      // roll back optimistic choice
+      if (prev) setPollChoice(pollId, prev);
+      setMyPollChoices(pollChoices());
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -112,6 +135,7 @@ export default function AudiencePage({
     );
 
   const closed = (state?.session.status ?? session.status) === "closed";
+  const activePoll = state?.activePoll ?? null;
 
   return (
     <main className="page">
@@ -119,7 +143,42 @@ export default function AudiencePage({
         SundayPanel
       </Link>
       <h1 style={{ margin: "4px 0 2px" }}>{session.title}</h1>
-      <p className="muted">Spørsmålene dine er helt anonyme.</p>
+      <p className="muted">Svarene dine er helt anonyme.</p>
+
+      {activePoll && (
+        <section className="card poll-vote">
+          <h2 style={{ fontSize: "1.1rem", marginTop: 0 }}>
+            {activePoll.poll.question}
+          </h2>
+          {activePoll.poll.status === "closed" ? (
+            <p className="muted">Avstemningen er lukket.</p>
+          ) : closed ? (
+            <p className="muted">Innsendingen er stengt.</p>
+          ) : (
+            <div className="poll-options">
+              {activePoll.poll.options.map((opt) => {
+                const picked = myPollChoices[activePoll.poll.id] === opt;
+                return (
+                  <button
+                    key={opt}
+                    className={`poll-choice${picked ? " poll-choice--on" : ""}`}
+                    onClick={() => castPoll(activePoll, opt)}
+                  >
+                    {opt}
+                    {picked && <span aria-hidden> ✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {myPollChoices[activePoll.poll.id] && (
+            <p className="muted" style={{ marginBottom: 0 }}>
+              Du svarte: <strong>{myPollChoices[activePoll.poll.id]}</strong>
+              {activePoll.poll.status === "open" && " — du kan endre svaret."}
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="card">
         {closed ? (

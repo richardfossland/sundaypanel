@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, use } from "react";
 import QRCode from "qrcode";
 import { useSessionState } from "@/lib/client/useSessionState";
+import type { PollResults } from "@/lib/types";
 
 export default function BoardPage({
   params,
@@ -67,7 +68,18 @@ export default function BoardPage({
         </div>
       </header>
 
-      {s.mode === "curated" ? (
+      {s.mode === "poll" ? (
+        <section className="board-poll">
+          {state.activePoll ? (
+            <PollBoard results={state.activePoll} />
+          ) : (
+            <p className="board-empty">
+              Avstemning kommer — skann QR-koden eller gå til
+              panel.sundaysuite.app og bruk koden {s.code}
+            </p>
+          )}
+        </section>
+      ) : s.mode === "curated" ? (
         <section className="board-live">
           {live ? (
             <blockquote className={live.body.length > 90 ? "long" : ""}>
@@ -101,5 +113,46 @@ export default function BoardPage({
         </>
       )}
     </main>
+  );
+}
+
+/** Live bar chart for the active poll. Bars scale to the leading option so
+ * the result is readable from across a room; each row shows the option, its
+ * share, and the raw count. Driven entirely by the refetched tally — the
+ * server is the source of truth, this only theatricalises it. */
+function PollBoard({ results }: { results: PollResults }) {
+  const { poll, counts, total } = results;
+  const max = Math.max(1, ...poll.options.map((o) => counts[o] ?? 0));
+  return (
+    <div className="poll">
+      <h2 className="poll-q">{poll.question}</h2>
+      <div className="poll-bars">
+        {poll.options.map((opt) => {
+          const c = counts[opt] ?? 0;
+          const pct = total > 0 ? Math.round((c / total) * 100) : 0;
+          const lead = c > 0 && c === max;
+          return (
+            <div className={`poll-row${lead ? " poll-row--lead" : ""}`} key={opt}>
+              <div className="poll-row-head">
+                <span className="poll-opt">{opt}</span>
+                <span className="poll-pct">
+                  {pct}% <span className="poll-count">({c})</span>
+                </span>
+              </div>
+              <div className="poll-track">
+                <div
+                  className="poll-fill"
+                  style={{ width: `${(c / max) * 100}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="poll-total">
+        {total} {total === 1 ? "svar" : "svar"}
+        {poll.status === "closed" && " · Avstemning lukket"}
+      </p>
+    </div>
   );
 }
