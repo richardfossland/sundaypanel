@@ -43,6 +43,8 @@ export const errorText: Record<string, string> = {
   for_mange_foresporsler: "For mange forsøk — vent litt.",
   sporsmal_skjult: "Spørsmålet er skjult.",
   kunne_ikke_sende: "Kunne ikke sende — prøv igjen.",
+  ai_ikke_konfigurert: "AI ikke konfigurert.",
+  ai_feilet: "AI-gjennomgangen feilet — prøv igjen.",
 };
 
 export function humanError(e: unknown): string {

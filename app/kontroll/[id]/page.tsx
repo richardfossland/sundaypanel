@@ -46,6 +46,11 @@ export default function ControlPage({
   const [search, setSearch] = useState("");
   const [actErr, setActErr] = useState<string | null>(null);
 
+  // AI 'Rydd opp' state.
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMsg, setAiMsg] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
   async function act(payload: Record<string, unknown>) {
     setActErr(null);
     try {
@@ -58,6 +63,38 @@ export default function ControlPage({
     } catch (e) {
       setActErr(humanError(e));
     }
+  }
+
+  async function runAi() {
+    setActErr(null);
+    setAiMsg(null);
+    setAiBusy(true);
+    try {
+      const r = await postJson<{
+        flagged: number;
+        clustered: number;
+        rephrased: number;
+        considered: number;
+      }>("/api/moderator/ai", { sessionId: id, organiserCode });
+      setAiMsg(
+        `AI så på ${r.considered} spørsmål: ${r.clustered} klynger, ` +
+          `${r.flagged} foreslått skjult, ${r.rephrased} omformuleringer.`,
+      );
+      refetch();
+    } catch (e) {
+      setActErr(humanError(e));
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  function toggleExpand(clusterId: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(clusterId)) next.delete(clusterId);
+      else next.add(clusterId);
+      return next;
+    });
   }
 
   const questions = useMemo(() => {
@@ -76,6 +113,28 @@ export default function ControlPage({
       return b.created_at.localeCompare(a.created_at);
     });
   }, [state, tab, sort, search]);
+
+  // Group AI-clustered questions into one card while preserving sort order: the
+  // first question of each cluster anchors the group at its sorted position;
+  // standalone questions (no cluster_id) are singleton groups.
+  const clusters = useMemo(() => {
+    const groups: Question[][] = [];
+    const byCluster = new Map<string, Question[]>();
+    for (const q of questions) {
+      if (!q.cluster_id) {
+        groups.push([q]);
+        continue;
+      }
+      let g = byCluster.get(q.cluster_id);
+      if (!g) {
+        g = [];
+        byCluster.set(q.cluster_id, g);
+        groups.push(g); // anchor cluster at first-seen (sorted) position
+      }
+      g.push(q);
+    }
+    return groups;
+  }, [questions]);
 
   if (!organiserCode) {
     return (
@@ -157,6 +216,14 @@ export default function ControlPage({
             Tøm skjermen
           </button>
         )}
+        <button
+          className="btn btn--ghost btn--small"
+          onClick={runAi}
+          disabled={aiBusy}
+          title="Bruk AI til å gruppere like spørsmål og foreslå moderering (du bestemmer alltid)"
+        >
+          {aiBusy ? "Rydder opp…" : "✨ Rydd opp"}
+        </button>
       </div>
 
       <div className="toolbar">
@@ -192,12 +259,44 @@ export default function ControlPage({
       </div>
 
       {actErr && <p className="error">{actErr}</p>}
+      {aiMsg && <p className="muted">{aiMsg}</p>}
 
       <ul className="qlist">
-        {questions.map((q) => (
-          <QuestionRow key={q.id} q={q} isLive={q.id === liveId} act={act} />
-        ))}
-        {questions.length === 0 && <li className="muted">Ingen spørsmål her.</li>}
+        {clusters.map((group) => {
+          if (group.length === 1) {
+            const q = group[0];
+            return (
+              <QuestionRow key={q.id} q={q} isLive={q.id === liveId} act={act} />
+            );
+          }
+          // A real cluster: collapse into one card with a count + expand.
+          const clusterId = group[0].cluster_id as string;
+          const isOpen = expanded.has(clusterId);
+          return (
+            <li key={clusterId} className="qitem qitem--cluster">
+              <div className="qbody">
+                <p className="qtext">
+                  <span className="tag tag--cluster">🔗 {group.length} like spørsmål</span>{" "}
+                  {group[0].body}
+                </p>
+                <button
+                  className="btn btn--ghost btn--small"
+                  onClick={() => toggleExpand(clusterId)}
+                >
+                  {isOpen ? "Skjul gruppe" : "Vis alle"}
+                </button>
+                {isOpen && (
+                  <ul className="qlist qlist--nested">
+                    {group.map((q) => (
+                      <QuestionRow key={q.id} q={q} isLive={q.id === liveId} act={act} />
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </li>
+          );
+        })}
+        {clusters.length === 0 && <li className="muted">Ingen spørsmål her.</li>}
       </ul>
     </main>
   );
@@ -212,11 +311,13 @@ function QuestionRow({
   isLive: boolean;
   act: (p: Record<string, unknown>) => void;
 }) {
+  const flagged = !!q.flag_reason;
   const cls =
     "qitem" +
     (isLive ? " qitem--live" : "") +
     (q.status === "answered" ? " qitem--answered" : "") +
-    (q.status === "hidden" ? " qitem--hidden" : "");
+    (q.status === "hidden" ? " qitem--hidden" : "") +
+    (flagged ? " qitem--flagged" : "");
   return (
     <li className={cls}>
       <div className="qbody">
@@ -227,7 +328,34 @@ function QuestionRow({
           {q.status === "queued" && <span className="tag tag--queued">I kø</span>}
           {q.status === "answered" && <span className="tag tag--answered">Besvart</span>}
           {q.status === "hidden" && <span className="tag">Skjult</span>}
+          {flagged && (
+            <span className="tag tag--flag" title={q.flag_reason ?? undefined}>
+              ⚠️ foreslått skjult
+            </span>
+          )}
         </div>
+        {flagged && q.flag_reason && (
+          <p className="ai-note ai-note--flag">AI: {q.flag_reason}</p>
+        )}
+        {q.suggested_body && (
+          <div className="ai-note ai-note--rephrase">
+            <span className="muted">AI foreslår:</span> «{q.suggested_body}»
+            <div className="qactions">
+              <button
+                className="btn btn--ghost btn--small"
+                onClick={() => act({ action: "rephrase", questionId: q.id })}
+              >
+                Bruk omformulering
+              </button>
+              <button
+                className="btn btn--ghost btn--small"
+                onClick={() => act({ action: "clearflag", questionId: q.id })}
+              >
+                Behold original
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <div className="qactions">
         {q.status === "hidden" ? (

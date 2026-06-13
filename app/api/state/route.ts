@@ -1,7 +1,7 @@
 import { ok, fail } from "@/lib/server/http";
 import { authModerator } from "@/lib/server/auth";
 import { getSession, listQuestions } from "@/lib/server/store";
-import { toPublicSession } from "@/lib/dto";
+import { toPublicSession, toPublicQuestion } from "@/lib/dto";
 
 // GET /api/state?sessionId=…[&organiserCode=…]
 // Public (audience/board): hidden questions are stripped server-side.
@@ -21,8 +21,8 @@ export async function GET(req: Request) {
 
   const s = await getSession(sessionId);
   if (!s) return fail(404, "finnes_ikke");
-  const questions = (await listQuestions(s.id)).filter(
-    (q) => q.status !== "hidden",
-  );
+  const questions = (await listQuestions(s.id))
+    .filter((q) => q.status !== "hidden")
+    .map(toPublicQuestion); // strip AI suggestions — audience never sees them
   return ok({ session: toPublicSession(s), questions });
 }

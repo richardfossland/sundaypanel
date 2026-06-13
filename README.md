@@ -11,7 +11,7 @@ velger hva som vises på storskjermen. Del av Sunday-suiten.
 |---|---|---|
 | `/` | alle | Bli med (panelkode) / opprett panel |
 | `/sporsmal/[code]` | ungdom (mobil) | Send inn anonymt, se + 👍 andres spørsmål |
-| `/kontroll/[id]` | moderator | Innboks/kø/besvart/skjult, søk, sorter, «Vis på skjerm», modusbryter |
+| `/kontroll/[id]` | moderator | Innboks/kø/besvart/skjult, søk, sorter, «Vis på skjerm», modusbryter, «✨ Rydd opp» (AI) |
 | `/board/[id]` | storskjerm | Kuratert: valgt spørsmål stort. Åpen: vegg av alle + fremhevet. QR + kode |
 
 ## Moduser
@@ -34,6 +34,33 @@ velger hva som vises på storskjermen. Del av Sunday-suiten.
   klientene refetcher autoritativ state, med 15 s polling som sikkerhetsnett.
   Ingen tabeller ligger på supabase_realtime.
 
+## AI-assistert moderering («Rydd opp»)
+
+Moderatorhandlingen «Rydd opp» (`POST /api/moderator/ai`, arrangørkode-gated,
+service-role) kjører ÉN LLM-runde (Claude via `lib/server/llm.ts`) over innboksen
++ køen og skriver tilbake KUN forslag på `panel.questions` (migrasjon 0002):
+
+- **`cluster_id`** — semantisk like spørsmål får samme id; moderatorsiden kollapser
+  dem til ett kort med antall + «Vis alle».
+- **`flag_reason`** — kort norsk begrunnelse → MYK «⚠️ foreslått skjult»-badge.
+  Skjuler ALDRI automatisk; moderator bestemmer.
+- **`suggested_body`** — valgfri nøytral omformulering moderator kan godta
+  («Bruk omformulering») eller avvise («Behold original»).
+
+Diciplin (alt håndhevet i kode, testet i `test/ai-moderation.test.ts`):
+
+- **Kun spørsmåls-BODY-er** sendes til modellen — aldri device-tokens (de bor
+  bare i `panel.votes`). Verifisert i unit-test (`buildUserPrompt`).
+- Modellen **foreslår**; server/DB bestemmer. Output saneres mot streng shape +
+  DB-grenser (`parseVerdicts`/`buildModerationResult`) før den rører state.
+  En klynge på 1 dropp es; identisk omformulering droppes; hver kandidat får
+  full patch (re-kjøring erstatter gamle forslag).
+- AI-kolonnene **strippes server-side for publikum/storskjerm** (`toPublicQuestion`
+  i `lib/dto.ts`) — kun moderatorvisningen ser dem.
+- **Nøkkelløs fallback:** uten `ANTHROPIC_API_KEY` returnerer `getLlmClient()`
+  null → ruten svarer «AI ikke konfigurert»; manuell moderering er upåvirket.
+  Nøkkelen er KUN server-side (Worker-secret), aldri i klientbundelen.
+
 ## Utvikling
 
 ```bash
@@ -50,15 +77,16 @@ npm run dev
 ## Test
 
 ```bash
-npm run check          # tsc + eslint + vitest
-./scripts/test-db.sh   # migrasjon (idempotens) + 14 logikk/RLS-assertions mot Docker-Postgres
+npm run check          # tsc + eslint + vitest (inkl. 18 AI-moderering-enhetstester)
+./scripts/test-db.sh   # migrasjoner 0001+0002 (idempotens) + logikk/RLS/AI-assertions mot Docker-Postgres
 BASE=http://localhost:3000 node scripts/smoke.mjs   # 33 ende-til-ende-assertions
 ```
 
 ## Deploy
 
-1. **Migrasjon** (én gang): kjør `supabase/migrations/0001_panel_schema.sql` i
-   Supabase SQL-editor på det delte prosjektet.
+1. **Migrasjon** (én gang): kjør `supabase/migrations/0001_panel_schema.sql` +
+   `supabase/migrations/0002_ai_moderation.sql` i Supabase SQL-editor på det
+   delte prosjektet (0002 er additiv + idempotent).
 2. **Eksponer schema** (én gang, MÅ gjøres i dashboard — lærdom fra Harvest):
    Settings → API → Exposed schemas → legg til `panel` → Save.
    Uten dette feiler ALLE kall (også service-role) gjennom PostgREST.
@@ -67,6 +95,7 @@ BASE=http://localhost:3000 node scripts/smoke.mjs   # 33 ende-til-ende-assertion
    npx opennextjs-cloudflare build
    npx opennextjs-cloudflare deploy
    npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY   # én gang
+   npx wrangler secret put ANTHROPIC_API_KEY           # valgfritt — slår på «Rydd opp»
    ```
 4. Prod-røyktest: `BASE=https://panel.sundaysuite.app node scripts/smoke.mjs`
    (etterlater én stengt «Røyktest …»-sesjon i DB).
