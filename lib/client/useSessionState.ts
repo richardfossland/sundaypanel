@@ -4,15 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useChannel } from "@/lib/client/useChannel";
 import { channels } from "@/lib/realtime";
 import { getJson } from "@/lib/client/api";
-import type { PublicSession, Question } from "@/lib/types";
+import type { ModeratorState } from "@/lib/types";
 
-/** State shape returned by /api/state. Questions carry AI-moderation fields
- * (cluster_id/flag_reason/suggested_body) ONLY on the moderator path; the
- * public path strips them server-side, so they're optional on Question. */
-interface SessionState {
-  session: PublicSession;
-  questions: Question[];
-}
+/** State shape returned by /api/state. We type it as the moderator superset:
+ * questions carry the optional AI-moderation fields (cluster_id/flag_reason/
+ * suggested_body) on the moderator path; the public path strips them
+ * server-side (toPublicQuestion), so they're simply undefined there. Polls and
+ * the active poll (with tallies) are present on both paths. */
+type SessionState = ModeratorState;
 
 /** Poll + realtime-hint state for a session. Broadcast events trigger an
  * immediate refetch; a slow poll (15 s) is the safety net if realtime drops.

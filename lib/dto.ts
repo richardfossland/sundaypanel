@@ -15,6 +15,7 @@ export function toPublicSession(s: Session): PublicSession {
     mode: s.mode,
     status: s.status,
     live_question_id: s.live_question_id,
+    active_poll_id: s.active_poll_id,
   };
 }
 

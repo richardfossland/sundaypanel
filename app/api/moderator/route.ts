@@ -1,9 +1,10 @@
 import { ok, fail, readJson } from "@/lib/server/http";
 import { authModerator } from "@/lib/server/auth";
-import { db, getQuestion } from "@/lib/server/store";
+import { db, getQuestion, getPoll } from "@/lib/server/store";
 import { broadcast } from "@/lib/server/broadcast";
 import { channels, events } from "@/lib/realtime";
-import type { Question, SessionMode, SessionStatus } from "@/lib/types";
+import { normalizePollOptions } from "@/lib/poll";
+import type { Poll, Question, SessionMode, SessionStatus } from "@/lib/types";
 
 // POST /api/moderator — every moderator action, organiser-code gated.
 //   body: { sessionId, organiserCode, action, ... }
@@ -15,8 +16,15 @@ import type { Question, SessionMode, SessionStatus } from "@/lib/types";
 //           'rephrase'{ questionId }         accept the AI suggested_body as the
 //                                            new body; clears the suggestion
 //           'clearflag' { questionId }       dismiss the AI flag (keeps question)
-//           'mode'    { mode }               curated | open
+//           'mode'    { mode }               curated | open | poll
 //           'status'  { status }             open | closed (submission gate)
+//           'poll'    { pollAction, ... }    live poll lifecycle (see below)
+type PollAction =
+  | { pollAction: "create"; question?: string; options?: unknown }
+  | { pollAction: "open"; pollId?: string }
+  | { pollAction: "close"; pollId?: string }
+  | { pollAction: "show"; pollId?: string | null };
+
 type Body = {
   sessionId?: string;
   organiserCode?: string;
@@ -25,7 +33,7 @@ type Body = {
   on?: boolean;
   mode?: SessionMode;
   status?: SessionStatus;
-};
+} & Partial<PollAction>;
 
 export async function POST(req: Request) {
   const body = await readJson<Body>(req);
@@ -48,6 +56,70 @@ export async function POST(req: Request) {
     await db().from("sessions").update({ status: body.status }).eq("id", s.id);
     await broadcast(channels.session(s.id), events.stateChanged, {});
     return ok({ status: body.status });
+  }
+
+  // Poll-level actions ---------------------------------------------------
+  //   create { question, options }  → new poll (status 'open')
+  //   open   { pollId }             → reopen a closed poll
+  //   close  { pollId }             → stop accepting responses (keeps tally)
+  //   show   { pollId | null }      → put a poll on the big screen / clear it
+  if (action === "poll") {
+    const pollAction = body?.pollAction;
+
+    if (pollAction === "create") {
+      const question =
+        typeof body?.question === "string" ? body.question.trim() : "";
+      if (!question || question.length > 200)
+        return fail(400, "ugyldig_pollsporsmal");
+      const options = normalizePollOptions(body?.options);
+      if (!options) return fail(400, "ugyldig_alternativer");
+
+      const { data, error } = await db()
+        .from("polls")
+        .insert({ session_id: s.id, question, options })
+        .select("*")
+        .single();
+      if (error || !data) {
+        console.error("[poll:create]", error?.message);
+        return fail(500, "kunne_ikke_opprette");
+      }
+      await broadcast(channels.session(s.id), events.pollChanged, {});
+      return ok({ poll: data as Poll });
+    }
+
+    // For open/close/show we need a poll that belongs to this session.
+    const ensurePoll = async (id: unknown): Promise<Poll | null> => {
+      if (typeof id !== "string") return null;
+      const p = await getPoll(id);
+      return p && p.session_id === s.id ? p : null;
+    };
+
+    if (pollAction === "open" || pollAction === "close") {
+      const p = await ensurePoll(body?.pollId);
+      if (!p) return fail(404, "finnes_ikke");
+      const status = pollAction === "open" ? "open" : "closed";
+      await db().from("polls").update({ status }).eq("id", p.id);
+      await broadcast(channels.session(s.id), events.pollChanged, {});
+      return ok({ pollId: p.id, status });
+    }
+
+    if (pollAction === "show") {
+      // show(null) clears the big screen.
+      let pollId: string | null = null;
+      if (body?.pollId != null) {
+        const p = await ensurePoll(body.pollId);
+        if (!p) return fail(404, "finnes_ikke");
+        pollId = p.id;
+      }
+      await db()
+        .from("sessions")
+        .update({ active_poll_id: pollId })
+        .eq("id", s.id);
+      await broadcast(channels.session(s.id), events.pollChanged, {});
+      return ok({ activePollId: pollId });
+    }
+
+    return fail(400, "ugyldig_pollaction");
   }
 
   // Question-level actions -----------------------------------------------

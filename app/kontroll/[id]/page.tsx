@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, use } from "react";
 import Link from "next/link";
 import { postJson, humanError } from "@/lib/client/api";
 import { useSessionState } from "@/lib/client/useSessionState";
-import type { Question } from "@/lib/types";
+import type { Poll, PollResults, Question } from "@/lib/types";
 
 type Tab = "alle" | "ko" | "besvart" | "skjult";
 type Sort = "stemmer" | "nyeste";
@@ -51,7 +51,7 @@ export default function ControlPage({
   const [aiMsg, setAiMsg] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  async function act(payload: Record<string, unknown>) {
+  async function act(payload: Record<string, unknown>): Promise<boolean> {
     setActErr(null);
     try {
       await postJson("/api/moderator", {
@@ -60,8 +60,10 @@ export default function ControlPage({
         ...payload,
       });
       refetch();
+      return true;
     } catch (e) {
       setActErr(humanError(e));
+      return false;
     }
   }
 
@@ -202,6 +204,9 @@ export default function ControlPage({
           <button className={s.mode === "open" ? "on" : ""} onClick={() => act({ action: "mode", mode: "open" })}>
             Åpen vegg
           </button>
+          <button className={s.mode === "poll" ? "on" : ""} onClick={() => act({ action: "mode", mode: "poll" })}>
+            Avstemning
+          </button>
         </div>
         <div className="seg" role="group" aria-label="Innsending">
           <button className={s.status === "open" ? "on" : ""} onClick={() => act({ action: "status", status: "open" })}>
@@ -225,6 +230,15 @@ export default function ControlPage({
           {aiBusy ? "Rydder opp…" : "✨ Rydd opp"}
         </button>
       </div>
+
+      {s.mode === "poll" && (
+        <PollPanel
+          polls={state.polls}
+          activePoll={state.activePoll}
+          activePollId={s.active_poll_id}
+          act={act}
+        />
+      )}
 
       <div className="toolbar">
         <input
@@ -299,6 +313,139 @@ export default function ControlPage({
         {clusters.length === 0 && <li className="muted">Ingen spørsmål her.</li>}
       </ul>
     </main>
+  );
+}
+
+function PollPanel({
+  polls,
+  activePoll,
+  activePollId,
+  act,
+}: {
+  polls: Poll[];
+  activePoll: PollResults | null;
+  activePollId: string | null;
+  act: (p: Record<string, unknown>) => Promise<boolean>;
+}) {
+  const [question, setQuestion] = useState("");
+  const [optionsText, setOptionsText] = useState("Ja\nNei\nUsikker");
+  const [createErr, setCreateErr] = useState<string | null>(null);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateErr(null);
+    const options = optionsText
+      .split("\n")
+      .map((o) => o.trim())
+      .filter(Boolean);
+    if (!question.trim()) {
+      setCreateErr("Skriv et spørsmål.");
+      return;
+    }
+    if (options.length < 2 || options.length > 8) {
+      setCreateErr("Oppgi 2–8 svaralternativer (ett per linje).");
+      return;
+    }
+    const okFlag = await act({
+      action: "poll",
+      pollAction: "create",
+      question: question.trim(),
+      options,
+    });
+    if (okFlag) {
+      setQuestion("");
+      setOptionsText("Ja\nNei\nUsikker");
+    }
+  }
+
+  return (
+    <section className="card poll-admin">
+      <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>Avstemning</h2>
+
+      <form onSubmit={create} className="poll-create">
+        <input
+          className="field"
+          placeholder="Spørsmål til salen…"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value.slice(0, 200))}
+          maxLength={200}
+        />
+        <textarea
+          className="field"
+          placeholder="Ett svaralternativ per linje"
+          value={optionsText}
+          onChange={(e) => setOptionsText(e.target.value)}
+          rows={3}
+        />
+        <div className="row" style={{ marginTop: 8 }}>
+          <span className="muted" style={{ flex: 1 }}>
+            Ett alternativ per linje (2–8).
+          </span>
+          <button className="btn">Lag avstemning</button>
+        </div>
+        {createErr && <p className="error">{createErr}</p>}
+      </form>
+
+      <ul className="qlist" style={{ marginTop: 12 }}>
+        {polls.map((p) => {
+          const isActive = p.id === activePollId;
+          const tally = isActive ? activePoll : null;
+          return (
+            <li
+              key={p.id}
+              className={`qitem${isActive ? " qitem--live" : ""}`}
+            >
+              <div className="qbody">
+                <p className="qtext">{p.question}</p>
+                <div className="qmeta">
+                  <span className="tag">{p.options.join(" · ")}</span>
+                  {isActive && <span className="tag tag--live">På skjermen</span>}
+                  {p.status === "closed" && (
+                    <span className="tag tag--answered">Lukket</span>
+                  )}
+                  {tally && <span className="tag">{tally.total} svar</span>}
+                </div>
+              </div>
+              <div className="qactions">
+                {isActive ? (
+                  <button
+                    className="btn btn--ghost btn--small"
+                    onClick={() => act({ action: "poll", pollAction: "show", pollId: null })}
+                  >
+                    Tøm skjerm
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn--small"
+                    onClick={() => act({ action: "poll", pollAction: "show", pollId: p.id })}
+                  >
+                    Vis på skjerm
+                  </button>
+                )}
+                {p.status === "open" ? (
+                  <button
+                    className="btn btn--ghost btn--small"
+                    onClick={() => act({ action: "poll", pollAction: "close", pollId: p.id })}
+                  >
+                    Lukk
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn--ghost btn--small"
+                    onClick={() => act({ action: "poll", pollAction: "open", pollId: p.id })}
+                  >
+                    Åpne igjen
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+        {polls.length === 0 && (
+          <li className="muted">Ingen avstemninger ennå.</li>
+        )}
+      </ul>
+    </section>
   );
 }
 

@@ -45,6 +45,12 @@ export const errorText: Record<string, string> = {
   kunne_ikke_sende: "Kunne ikke sende — prøv igjen.",
   ai_ikke_konfigurert: "AI ikke konfigurert.",
   ai_feilet: "AI-gjennomgangen feilet — prøv igjen.",
+  ugyldig_pollsporsmal: "Avstemningsspørsmålet må være 1–200 tegn.",
+  ugyldig_alternativer: "Oppgi 2–8 svaralternativer.",
+  ugyldig_valg: "Ugyldig svar.",
+  stemme_avvist: "Kunne ikke registrere svaret — avstemningen er kanskje lukket.",
+  kunne_ikke_stemme: "Kunne ikke stemme — prøv igjen.",
+  kunne_ikke_opprette: "Kunne ikke opprette — prøv igjen.",
 };
 
 export function humanError(e: unknown): string {

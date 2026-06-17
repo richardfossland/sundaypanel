@@ -1,5 +1,5 @@
 -- SundayPanel AI-moderation assertions, run against real Postgres by
--- scripts/test-db.sh after migration 0002 (applied twice for idempotency).
+-- scripts/test-db.sh after migration 0003 (applied twice for idempotency).
 -- Verifies the additive columns, their constraints, the partial cluster index,
 -- and that anon still can't touch the table. Prints PASS lines; raises on first
 -- failure.
@@ -65,7 +65,7 @@ begin
   -- the original body constraint is untouched by the migration -----
   begin
     insert into panel.questions (session_id, body) values (s_id, repeat('z', 281));
-    raise exception 'FAIL: 281-char body accepted post-0002';
+    raise exception 'FAIL: 281-char body accepted post-0003';
   exception when check_violation then
     raise notice 'PASS: original body constraint still enforced';
   end;
