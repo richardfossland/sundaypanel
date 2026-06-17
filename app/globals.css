@@ -280,6 +280,48 @@ textarea.field {
   color: var(--accent);
 }
 
+/* --- AI-assisted moderation (suggestions only — never auto-applied) --- */
+.tag--flag {
+  background: #5a2a2a;
+  color: #ffd7d0;
+}
+
+.tag--cluster {
+  background: #2a3f5a;
+  color: #d0e2ff;
+}
+
+.qitem--flagged {
+  border-color: #7a3b3b;
+}
+
+.qitem--cluster {
+  border-style: dashed;
+}
+
+.ai-note {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  border-radius: 8px;
+  padding: 6px 9px;
+  background: var(--bg-soft);
+}
+
+.ai-note--flag {
+  color: #ffb3a8;
+}
+
+.ai-note--rephrase {
+  border: 1px dashed var(--card-edge);
+  background: transparent;
+}
+
+.qlist--nested {
+  margin-top: 10px;
+  padding-left: 10px;
+  border-left: 2px solid var(--card-edge);
+}
+
 .votebtn {
   display: flex;
   flex-direction: column;

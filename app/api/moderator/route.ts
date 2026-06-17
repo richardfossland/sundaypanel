@@ -13,6 +13,9 @@ import type { Poll, Question, SessionMode, SessionStatus } from "@/lib/types";
 //           'answer'  { questionId }         mark answered (clears live if live)
 //           'hide'    { questionId, on }     toggle hidden (clears live if live)
 //           'restore' { questionId }         back to status 'new'
+//           'rephrase'{ questionId }         accept the AI suggested_body as the
+//                                            new body; clears the suggestion
+//           'clearflag' { questionId }       dismiss the AI flag (keeps question)
 //           'mode'    { mode }               curated | open | poll
 //           'status'  { status }             open | closed (submission gate)
 //           'poll'    { pollAction, ... }    live poll lifecycle (see below)
@@ -180,6 +183,28 @@ export async function POST(req: Request) {
     case "restore": {
       await db().from("questions").update({ status: "new" }).eq("id", q.id);
       await clearLiveIfNeeded();
+      break;
+    }
+    case "rephrase": {
+      // Accept the AI-suggested rephrase: the suggestion BECOMES the body, and
+      // both AI columns clear (the suggestion is now applied, the flag stale).
+      // A human chose this; the model only proposed it. No-op if there's none.
+      const suggested =
+        typeof q.suggested_body === "string" ? q.suggested_body.trim() : "";
+      if (!suggested || suggested.length > 280)
+        return fail(409, "ingen_omformulering");
+      await db()
+        .from("questions")
+        .update({ body: suggested, suggested_body: null, flag_reason: null })
+        .eq("id", q.id);
+      break;
+    }
+    case "clearflag": {
+      // Dismiss the soft AI flag / suggestion without touching status or body.
+      await db()
+        .from("questions")
+        .update({ flag_reason: null, suggested_body: null })
+        .eq("id", q.id);
       break;
     }
     default:

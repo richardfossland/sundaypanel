@@ -6,7 +6,7 @@ import {
   listPolls,
   getPollResults,
 } from "@/lib/server/store";
-import { toPublicSession } from "@/lib/dto";
+import { toPublicSession, toPublicQuestion } from "@/lib/dto";
 import type { Session } from "@/lib/types";
 
 // The active poll (with live tallies) is only meaningful when one is shown.
@@ -41,6 +41,8 @@ export async function GET(req: Request) {
     listPolls(s.id),
     activePollFor(s),
   ]);
-  const questions = allQuestions.filter((q) => q.status !== "hidden");
+  const questions = allQuestions
+    .filter((q) => q.status !== "hidden")
+    .map(toPublicQuestion); // strip AI suggestions — audience never sees them
   return ok({ session: toPublicSession(s), questions, polls, activePoll });
 }

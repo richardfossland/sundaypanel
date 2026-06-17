@@ -4,7 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useChannel } from "@/lib/client/useChannel";
 import { channels } from "@/lib/realtime";
 import { getJson } from "@/lib/client/api";
-import type { PublicState } from "@/lib/types";
+import type { ModeratorState } from "@/lib/types";
+
+/** State shape returned by /api/state. We type it as the moderator superset:
+ * questions carry the optional AI-moderation fields (cluster_id/flag_reason/
+ * suggested_body) on the moderator path; the public path strips them
+ * server-side (toPublicQuestion), so they're simply undefined there. Polls and
+ * the active poll (with tallies) are present on both paths. */
+type SessionState = ModeratorState;
 
 /** Poll + realtime-hint state for a session. Broadcast events trigger an
  * immediate refetch; a slow poll (15 s) is the safety net if realtime drops.
@@ -13,7 +20,7 @@ export function useSessionState(
   sessionId: string | null,
   organiserCode?: string | null,
 ) {
-  const [state, setState] = useState<PublicState | null>(null);
+  const [state, setState] = useState<SessionState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inflight = useRef(false);
 
@@ -23,7 +30,7 @@ export function useSessionState(
     try {
       const qs = new URLSearchParams({ sessionId });
       if (organiserCode) qs.set("organiserCode", organiserCode);
-      const data = await getJson<PublicState>(`/api/state?${qs}`);
+      const data = await getJson<SessionState>(`/api/state?${qs}`);
       setState(data);
       setError(null);
     } catch (e) {
