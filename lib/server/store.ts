@@ -1,7 +1,8 @@
 import "server-only";
 
 import { createServiceClient } from "@/lib/supabase/service";
-import type { Question, Session } from "@/lib/types";
+import type { Poll, PollResults, Question, Session } from "@/lib/types";
+import { tallyPoll } from "@/lib/poll";
 
 let client: ReturnType<typeof createServiceClient> | null = null;
 
@@ -39,4 +40,34 @@ export async function listQuestions(sessionId: string): Promise<Question[]> {
 export async function getQuestion(id: string): Promise<Question | null> {
   const { data } = await db().from("questions").select("*").eq("id", id).maybeSingle();
   return (data as Question | null) ?? null;
+}
+
+/** All polls for a session, newest first. */
+export async function listPolls(sessionId: string): Promise<Poll[]> {
+  const { data, error } = await db()
+    .from("polls")
+    .select("*")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`listPolls: ${error.message}`);
+  return (data as Poll[]) ?? [];
+}
+
+export async function getPoll(id: string): Promise<Poll | null> {
+  const { data } = await db().from("polls").select("*").eq("id", id).maybeSingle();
+  return (data as Poll | null) ?? null;
+}
+
+/** A poll plus its live tally. Reads only the `choice` column — device tokens
+ * never leave the server — and aggregates with the pure tallyPoll helper. */
+export async function getPollResults(pollId: string): Promise<PollResults | null> {
+  const poll = await getPoll(pollId);
+  if (!poll) return null;
+  const { data, error } = await db()
+    .from("poll_responses")
+    .select("choice")
+    .eq("poll_id", pollId);
+  if (error) throw new Error(`getPollResults: ${error.message}`);
+  const choices = ((data as { choice: string }[]) ?? []).map((r) => r.choice);
+  return tallyPoll(poll, choices);
 }
