@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Hanken_Grotesk, Sora } from "next/font/google";
+import { Hanken_Grotesk, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
-const display = Sora({
+// Suite brand fonts: Playfair Display (display/wordmark) + Hanken Grotesk (body).
+const display = Playfair_Display({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  weight: ["700", "800"],
 });
 const body = Hanken_Grotesk({
   variable: "--font-body",

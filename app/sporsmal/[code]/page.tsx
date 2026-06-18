@@ -196,8 +196,9 @@ export default function AudiencePage({
               <span className="muted" style={{ flex: 1 }}>
                 {text.length}/{MAX}
               </span>
-              <button className="btn" disabled={sending || !text.trim()}>
-                Send inn
+              <button className="btn" disabled={sending || !text.trim()} aria-busy={sending}>
+                {sending && <span className="spinner" aria-hidden="true" />}
+                {sending ? "Sender…" : "Send inn"}
               </button>
             </div>
             {sentFlash && <p style={{ color: "var(--good)", margin: "8px 0 0" }}>Sendt! 🙌</p>}
