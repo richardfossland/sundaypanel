@@ -51,6 +51,10 @@ export const errorText: Record<string, string> = {
   stemme_avvist: "Kunne ikke registrere svaret — avstemningen er kanskje lukket.",
   kunne_ikke_stemme: "Kunne ikke stemme — prøv igjen.",
   kunne_ikke_opprette: "Kunne ikke opprette — prøv igjen.",
+  // Sunday Account host surface.
+  ikke_innlogget: "Du er ikke innlogget.",
+  ikke_arrangor: "Kontoen din har ikke arrangørtilgang.",
+  kunne_ikke_slette: "Kunne ikke slette panelet — prøv igjen.",
 };
 
 export function humanError(e: unknown): string {
