@@ -225,8 +225,10 @@ export default function ControlPage({
           className="btn btn--ghost btn--small"
           onClick={runAi}
           disabled={aiBusy}
+          aria-busy={aiBusy}
           title="Bruk AI til å gruppere like spørsmål og foreslå moderering (du bestemmer alltid)"
         >
+          {aiBusy && <span className="spinner" aria-hidden="true" />}
           {aiBusy ? "Rydder opp…" : "✨ Rydd opp"}
         </button>
       </div>
@@ -330,6 +332,7 @@ function PollPanel({
   const [question, setQuestion] = useState("");
   const [optionsText, setOptionsText] = useState("Ja\nNei\nUsikker");
   const [createErr, setCreateErr] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -346,15 +349,20 @@ function PollPanel({
       setCreateErr("Oppgi 2–8 svaralternativer (ett per linje).");
       return;
     }
-    const okFlag = await act({
-      action: "poll",
-      pollAction: "create",
-      question: question.trim(),
-      options,
-    });
-    if (okFlag) {
-      setQuestion("");
-      setOptionsText("Ja\nNei\nUsikker");
+    setCreating(true);
+    try {
+      const okFlag = await act({
+        action: "poll",
+        pollAction: "create",
+        question: question.trim(),
+        options,
+      });
+      if (okFlag) {
+        setQuestion("");
+        setOptionsText("Ja\nNei\nUsikker");
+      }
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -381,7 +389,10 @@ function PollPanel({
           <span className="muted" style={{ flex: 1 }}>
             Ett alternativ per linje (2–8).
           </span>
-          <button className="btn">Lag avstemning</button>
+          <button className="btn" disabled={creating} aria-busy={creating}>
+            {creating && <span className="spinner" aria-hidden="true" />}
+            {creating ? "Lager…" : "Lag avstemning"}
+          </button>
         </div>
         {createErr && <p className="error">{createErr}</p>}
       </form>

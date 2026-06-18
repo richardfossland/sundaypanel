@@ -74,8 +74,9 @@ export default function Home() {
             autoComplete="off"
             aria-label="Panelkode"
           />
-          <button className="btn" disabled={joining || !joinCode.trim()}>
-            Bli med
+          <button className="btn" disabled={joining || !joinCode.trim()} aria-busy={joining}>
+            {joining && <span className="spinner" aria-hidden="true" />}
+            {joining ? "Kobler til…" : "Bli med"}
           </button>
         </form>
         {joinErr && <p className="error">{joinErr}</p>}
@@ -112,8 +113,9 @@ export default function Home() {
               maxLength={120}
             />
             <div style={{ marginTop: 10 }}>
-              <button className="btn" disabled={creating || !title.trim()}>
-                Opprett
+              <button className="btn" disabled={creating || !title.trim()} aria-busy={creating}>
+                {creating && <span className="spinner" aria-hidden="true" />}
+                {creating ? "Oppretter…" : "Opprett"}
               </button>
             </div>
             {createErr && <p className="error">{createErr}</p>}
