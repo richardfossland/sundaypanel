@@ -14,6 +14,9 @@ export interface Session {
   organiser_code: string; // never sent to public clients
   live_question_id: string | null;
   active_poll_id: string | null;
+  // Sunday Account host that created this panel while logged in (migration
+  // 0004). NULL for anonymous-created panels. Never sent to public clients.
+  owner_id: string | null;
   created_at: string;
 }
 

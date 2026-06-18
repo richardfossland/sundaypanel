@@ -122,6 +122,14 @@ export default function Home() {
           </form>
         )}
       </section>
+
+      <p className="muted" style={{ textAlign: "center", marginTop: 8 }}>
+        Arrangør?{" "}
+        <a href="/host" style={{ textDecoration: "underline" }}>
+          Logg inn med Sunday-konto
+        </a>{" "}
+        for å samle panelene dine.
+      </p>
     </main>
   );
 }

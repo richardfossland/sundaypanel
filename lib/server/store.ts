@@ -42,6 +42,40 @@ export async function getQuestion(id: string): Promise<Question | null> {
   return (data as Question | null) ?? null;
 }
 
+// ---------------------------------------------------------- Sunday host owner
+// Panels created by a logged-in Sunday Account host (owner_id stamped on
+// create). Powers the "Mine paneler" dashboard + the owner-gated DELETE route.
+
+/** All sessions owned by a given Sunday Account host, newest first. */
+export async function listSessionsByOwner(ownerId: string): Promise<Session[]> {
+  const { data, error } = await db()
+    .from("sessions")
+    .select("*")
+    .eq("owner_id", ownerId)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`listSessionsByOwner: ${error.message}`);
+  return (data as Session[]) ?? [];
+}
+
+/** Delete a session the host owns. Returns true if a row was deleted, false if
+ * the session does not exist or is owned by someone else (owner-gated: the
+ * .eq("owner_id", ownerId) is the authorization check, so a host can never
+ * delete a panel they don't own). Children (questions/votes/polls/poll_responses)
+ * are removed automatically by ON DELETE CASCADE. */
+export async function deleteSessionForOwner(
+  sessionId: string,
+  ownerId: string,
+): Promise<boolean> {
+  const { data, error } = await db()
+    .from("sessions")
+    .delete()
+    .eq("id", sessionId)
+    .eq("owner_id", ownerId)
+    .select("id");
+  if (error) throw new Error(`deleteSessionForOwner: ${error.message}`);
+  return (data?.length ?? 0) > 0;
+}
+
 /** All polls for a session, newest first. */
 export async function listPolls(sessionId: string): Promise<Poll[]> {
   const { data, error } = await db()
