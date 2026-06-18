@@ -7,12 +7,21 @@
   --card: #232050;
   --card-edge: #35316e;
   --text: #f3f1ff;
-  --text-dim: #a9a4d4;
-  --accent: #ffb84d;
-  --accent-deep: #e89a1f;
+  /* lifted from #a9a4d4 toward white for AA contrast on the indigo cards */
+  --text-dim: #bbb6e0;
+  /* Suite canonical gold (#EBB84B), warm light + deep for gradients. */
+  --gold: #ebb84b;
+  --gold-light: #f2d58a;
+  --gold-deep: #d4a23a;
+  --ink: #14171e;
+  --paper: #faf7f0;
+  /* `--accent` aliases the canonical gold so legacy class names stay gold. */
+  --accent: var(--gold);
+  --accent-deep: var(--gold-deep);
   --good: #5dd39e;
   --bad: #ff6b81;
   --radius: 14px;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 * {
@@ -25,14 +34,15 @@ body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-body), system-ui, sans-serif;
+  font-family: var(--font-body), "Hanken Grotesk", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
   min-height: 100%;
 }
 
 h1,
 h2,
 h3 {
-  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-family: var(--font-display), "Playfair Display", Georgia, serif;
   letter-spacing: -0.01em;
 }
 
@@ -43,6 +53,24 @@ a {
 button {
   font: inherit;
   cursor: pointer;
+}
+
+/* Keyboard focus ring — gold, only on keyboard nav (never on mouse click). */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 55%, transparent);
+  border-radius: 6px;
+}
+
+/* Honour users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 .page {
@@ -56,10 +84,11 @@ button {
 }
 
 .brand {
-  font-family: var(--font-display), sans-serif;
+  font-family: var(--font-display), "Playfair Display", Georgia, serif;
   font-weight: 800;
-  font-size: 1.1rem;
-  color: var(--accent);
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  color: var(--gold);
   text-decoration: none;
   display: inline-block;
   margin-bottom: 8px;
@@ -102,12 +131,19 @@ button {
   border-radius: 10px;
   color: var(--text);
   padding: 12px 14px;
-  font-size: 1rem;
+  /* ≥16px stops iOS Safari from auto-zooming on focus */
+  font-size: 16px;
   outline: none;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.field::placeholder {
+  color: var(--text-dim);
 }
 
 .field:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 16%, transparent);
 }
 
 textarea.field {
@@ -133,32 +169,65 @@ textarea.field {
 }
 
 .btn {
-  background: var(--accent);
-  color: #1d1503;
-  border: none;
+  /* Solid canonical gold with dark ink text — the suite's primary action. */
+  background: var(--gold);
+  color: var(--ink);
+  border: 1px solid transparent;
   border-radius: 10px;
   padding: 12px 18px;
+  min-height: 44px; /* comfortable touch target (WCAG 2.5.5) */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-weight: 700;
-  transition: transform 0.06s ease;
+  transition:
+    transform 0.12s var(--ease),
+    background 0.18s var(--ease),
+    box-shadow 0.18s var(--ease),
+    opacity 0.18s var(--ease);
+}
+
+.btn:hover {
+  background: var(--gold-light);
 }
 
 .btn:active {
   transform: scale(0.97);
 }
 
+/* Disabled: a clearly-inert neutral chip rather than a dimmed gold (which
+   blends with the indigo card into a "muddy brown" that reads as broken). */
 .btn:disabled {
-  opacity: 0.5;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  border-color: var(--card-edge);
   cursor: default;
+  transform: none;
+}
+
+/* Ghost/danger buttons keep their own look when disabled — just dim them. */
+.btn--ghost:disabled,
+.btn--danger:disabled {
+  background: transparent;
+  opacity: 0.5;
 }
 
 .btn--ghost {
   background: transparent;
   color: var(--text);
   border: 1px solid var(--card-edge);
+  min-height: 44px;
+}
+
+.btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--accent);
 }
 
 .btn--small {
   padding: 7px 12px;
+  min-height: 36px;
   font-size: 0.85rem;
   border-radius: 8px;
 }
@@ -167,6 +236,27 @@ textarea.field {
   background: transparent;
   border: 1px solid var(--bad);
   color: var(--bad);
+}
+
+.btn--danger:hover {
+  background: color-mix(in srgb, var(--bad) 14%, transparent);
+}
+
+/* inline spinner for busy submit buttons */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .muted {
@@ -261,7 +351,7 @@ textarea.field {
 
 .tag--live {
   background: var(--accent);
-  color: #1d1503;
+  color: var(--ink);
 }
 
 .tag--queued {
@@ -375,12 +465,14 @@ textarea.field {
   border: none;
   color: var(--text-dim);
   padding: 9px 14px;
+  min-height: 40px;
   font-weight: 600;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
 }
 
 .seg button.on {
   background: var(--accent);
-  color: #1d1503;
+  color: var(--ink);
 }
 
 /* ---------------- board (projector) ---------------- */
