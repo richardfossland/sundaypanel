@@ -4,6 +4,12 @@ import { useEffect, useMemo, useState, use } from "react";
 import QRCode from "qrcode";
 import { useSessionState } from "@/lib/client/useSessionState";
 import type { PollResults } from "@/lib/types";
+import { AvsluttKnapp } from "@/lib/client/storskjerm/AvsluttKnapp";
+import { usePresentasjon } from "@/lib/client/storskjerm/usePresentasjon";
+import { useHideCursor } from "@/lib/client/storskjerm/useHideCursor";
+import { useWakeLock } from "@/lib/client/storskjerm/useWakeLock";
+import { useFullskjermTast } from "@/lib/client/storskjerm/useFullskjermTast";
+import "@/lib/client/storskjerm/storskjerm.css";
 
 export default function BoardPage({
   params,
@@ -13,6 +19,13 @@ export default function BoardPage({
   const { id } = use(params);
   const { state } = useSessionState(id);
   const [qr, setQr] = useState<string | null>(null);
+  // `?visning=tavle`: ren skjerm for projektor/TV/cast. Tavla har ingen
+  // moderatorkontroller, så her legges bare til pekerskjul, wake lock, F og
+  // «Avslutt skjermvisning». «Vis på storskjerm» ligger i moderatorvisningen.
+  const presentasjon = usePresentasjon();
+  useHideCursor(presentasjon);
+  useWakeLock(presentasjon);
+  useFullskjermTast(presentasjon);
 
   const code = state?.session.code;
   useEffect(() => {
@@ -52,7 +65,7 @@ export default function BoardPage({
   const s = state.session;
 
   return (
-    <main className="board">
+    <main className={`board${presentasjon ? " presentasjon" : ""}`}>
       <header className="board-head">
         <h1 className="board-title">{s.title}</h1>
         <div className="board-join">
@@ -112,6 +125,7 @@ export default function BoardPage({
           </section>
         </>
       )}
+      {presentasjon && <AvsluttKnapp />}
     </main>
   );
 }
