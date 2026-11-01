@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, use } from "react";
 import Link from "next/link";
 import { postJson, humanError } from "@/lib/client/api";
 import { useSessionState } from "@/lib/client/useSessionState";
+import { StorskjermButton } from "@/lib/client/storskjerm/StorskjermButton";
 import type { Poll, PollResults, Question } from "@/lib/types";
 
 type Tab = "alle" | "ko" | "besvart" | "skjult";
@@ -195,6 +196,9 @@ export default function ControlPage({
         Panelkode <strong>{s.code}</strong> · {" "}
         <a href={`/board/${s.id}`} target="_blank">Åpne storskjerm ↗</a>
       </p>
+      <div style={{ marginBottom: 12 }}>
+        <StorskjermButton tavleHref={`/board/${s.id}`} />
+      </div>
 
       <div className="toolbar">
         <div className="seg" role="group" aria-label="Visningsmodus">
